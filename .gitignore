@@ -1,0 +1,6 @@
+.ipynb_checkpoints
+.vscode
+*.pyc
+*.json
+*.out
+__pycache__
