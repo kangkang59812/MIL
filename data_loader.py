@@ -11,7 +11,7 @@ import json
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
 
-    def __init__(self, root, origin_file, img_tags, vocab):
+    def __init__(self, root, origin_file, split, img_tags, vocab):
         """Set the path for images, captions and vocabulary wrapper.
 
         Args:
@@ -21,10 +21,23 @@ class CocoDataset(data.Dataset):
             transform: image transformer.
         """
         self.root = root
+        if split in {'train', 'restval'}:
+            self.split = ['train', 'restval']
+        if split in {'val'}:
+            self.split = ['val']
+        if split in {'test'}:
+            self.split = ['test']
+
         with open(origin_file, 'r') as j:
             self.origin_file = json.load(j)
+
+        self.images_id = [self.origin_file['images'][index]['imgid']
+                          for index in range(0, len(self.origin_file['images']))
+                          if self.origin_file['images'][index]['split'] in self.split]
+
         with open(img_tags, 'r') as j:
             self.img_tags = json.load(j)
+
         with open(vocab, 'r') as j:
             self.vocab = json.load(j)
         self.transform = transforms.Compose([
@@ -38,10 +51,11 @@ class CocoDataset(data.Dataset):
         """Returns one data pair (image and caption)."""
 
         word2id = self.vocab['word_map']
+        ID = self.images_id[index]
 
-        img_id = self.origin_file['images'][index]['imgid']
-        path = self.origin_file['images'][index]['filepath'] + \
-            '/'+self.origin_file['images'][index]['filename']
+        img_id = self.origin_file['images'][ID]['imgid']
+        path = self.origin_file['images'][ID]['filepath'] + \
+            '/'+self.origin_file['images'][ID]['filename']
 
         image = Image.open(os.path.join(self.root, path)).convert('RGB')
         if self.transform is not None:
@@ -49,16 +63,15 @@ class CocoDataset(data.Dataset):
 
         # Convert caption (string) to word ids.
         tags = []
-        t = list(map(str.lower, self.img_tags[str(index)]))
+        t = list(map(str.lower, self.img_tags[str(ID)]))
         tags = [word2id[token] for token in t]
         target = torch.Tensor(tags)
         return image, target
 
     def __len__(self):
-        return len(self.ids)
+        return len(self.images_id)
 
 
-'''
 def collate_fn(data):
     """Creates mini-batch tensors from the list of tuples (image, caption).
 
@@ -89,13 +102,14 @@ def collate_fn(data):
     return images, targets, lengths
 
 
-def get_loader(root, json, vocab, transform, batch_size, shuffle, num_workers):
+def get_loader(root, origin_file, split, img_tags, vocab, batch_size, shuffle, num_workers):
     """Returns torch.utils.data.DataLoader for custom coco dataset."""
     # COCO caption dataset
     coco = CocoDataset(root=root,
-                       json=json,
-                       vocab=vocab,
-                       transform=transform)
+                       origin_file=origin_file,
+                       split=split,
+                       img_tags=img_tags,
+                       vocab=vocab)
 
     # Data loader for COCO dataset
     # This will return (images, captions, lengths) for each iteration.
@@ -108,12 +122,18 @@ def get_loader(root, json, vocab, transform, batch_size, shuffle, num_workers):
                                               num_workers=num_workers,
                                               collate_fn=collate_fn)
     return data_loader
-'''
+
 
 if __name__ == "__main__":
     root = '/home/lkk/datasets/coco2014'
     origin_file = root+'/'+'dataset_coco.json'
     img_tags = './img_tags.json'
     voc = './vocab.json'
-    coco = CocoDataset(root, origin_file, img_tags, voc)
-    print(coco[0])
+    d = get_loader(root=root, origin_file=origin_file, split='train',
+                   img_tags=img_tags, vocab=voc, batch_size=8, shuffle=True, num_workers=0)
+    for i, (imgs, tars, lens) in enumerate(d):
+        images = imgs
+        targets = tars
+        lengths = lens
+        if i == 5:
+            break
