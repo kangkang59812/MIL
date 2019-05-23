@@ -6,7 +6,7 @@ import pickle
 import numpy as np
 from PIL import Image
 import json
-
+import pdb
 
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
@@ -41,7 +41,7 @@ class CocoDataset(data.Dataset):
         with open(vocab, 'r') as j:
             self.vocab = json.load(j)
         self.transform = transforms.Compose([
-            transforms.RandomCrop(224),
+            transforms.RandomCrop(224,pad_if_needed=True),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.485, 0.456, 0.406),
@@ -59,13 +59,18 @@ class CocoDataset(data.Dataset):
 
         image = Image.open(os.path.join(self.root, path)).convert('RGB')
         if self.transform is not None:
-            image = self.transform(image)
-
+            try:
+                image = self.transform(image)
+            except:
+                print('ssssss')
+                pdb.set_trace()
         # Convert caption (string) to word ids.
         tags = []
         t = list(map(str.lower, self.img_tags[str(ID)]))
         tags = [word2id[token] for token in t]
-        target = torch.Tensor(tags)
+        target = torch.zeros(len(word2id))
+        target[list(map(lambda n:n-1,tags))]=1
+        target = torch.Tensor(target)
         return image, target
 
     def __len__(self):
@@ -99,6 +104,7 @@ def collate_fn(data):
     for i, cap in enumerate(captions):
         end = lengths[i]
         targets[i, :end] = cap[:end]
+    lengths = [sum(cap).item() for cap in captions]
     return images, targets, lengths
 
 
