@@ -135,5 +135,6 @@ if __name__ == "__main__":
         images = imgs
         targets = tars
         lengths = lens
-        if i == 5:
+        print(images.shape, targets.shape)
+        if i == 2:
             break
