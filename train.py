@@ -16,6 +16,10 @@ from data_loader import get_loader
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 
+def visualization(features):
+    pass
+
+
 def main(args):
     # Create model directory
     if not os.path.exists(args.model_path):
@@ -50,12 +54,36 @@ def main(args):
 
     for epoch in range(args.num_epochs):
         for i, (imgs, tars, lens) in enumerate(train_loader):
-            images = imgs.to(device)
-            targets = tars.to(device)
+            images = imgs.cuda()
+            targets = tars.float().cuda()
 
             features = encoder(images)
             outputs = decoder(features)
-            print('')
+
+            pos = nn.functional.binary_cross_entropy(
+                outputs*targets, targets)*1e3
+            neg = nn.functional.binary_cross_entropy(
+                outputs*(1-targets)+targets, targets)*1
+
+            loss = pos+neg
+            decoder.zero_grad()
+            encoder.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # Print log info
+            if i % args.log_step == 0:
+                time_end = time.time()
+                print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Time:{}'
+                      .format(epoch, args.num_epochs, i, total_step, loss.item(), time_end-time_start))
+                time_start = time_end
+
+        # Save the model checkpoints
+        if (epoch+1) % args.save_step == 0:
+            torch.save(decoder.state_dict(), os.path.join(
+                args.model_path, 'decoder-{}-{}.ckpt'.format(epoch+1, i+1)))
+            torch.save(encoder.state_dict(), os.path.join(
+                args.model_path, 'encoder-{}-{}.ckpt'.format(epoch+1, i+1)))
 
 
 if __name__ == "__main__":
@@ -74,12 +102,12 @@ if __name__ == "__main__":
                         help='path for train annotation json file')
     parser.add_argument('--log_step', type=int, default=1,
                         help='step size for prining log info')
-    parser.add_argument('--save_step', type=int, default=100,
+    parser.add_argument('--save_step', type=int, default=1,
                         help='step size for saving trained models')
 
     # paraneters
-    parser.add_argument('--num_epochs', type=int, default=50)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--num_epochs', type=int, default=5)
+    parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--num_workers', type=int, default=0)
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     args = parser.parse_args()
