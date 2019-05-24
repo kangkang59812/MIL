@@ -6,13 +6,12 @@ import os
 from visual_concept import EncoderCNN, Decoder
 from torch.nn.utils.rnn import pack_padded_sequence
 from torchvision import transforms
-from torch.autograd import Variable
 import torch.nn.functional as F
 import time
 import random
 import json
 from data_loader import get_loader
-
+from tensorboardX import SummaryWriter
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
 
@@ -51,7 +50,7 @@ def main(args):
     optimizer = torch.optim.Adam(params, lr=args.learning_rate)
     time_start = time.time()
     total_step = len(train_loader)
-
+    writer = SummaryWriter(log_dir='./log')
     for epoch in range(args.num_epochs):
         for i, (imgs, tars, lens) in enumerate(train_loader):
             images = imgs.cuda()
@@ -60,12 +59,15 @@ def main(args):
             features = encoder(images)
             outputs = decoder(features)
 
+            # begin with 10.69
             pos = nn.functional.binary_cross_entropy(
                 outputs*targets, targets)*1e3
+            # begin with 0.7439
             neg = nn.functional.binary_cross_entropy(
                 outputs*(1-targets)+targets, targets)*1
 
-            loss = pos+neg
+            # begin with 11.4362
+            loss = (pos+neg)
             decoder.zero_grad()
             encoder.zero_grad()
             loss.backward()
@@ -77,14 +79,17 @@ def main(args):
                 print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Time:{}'
                       .format(epoch, args.num_epochs, i, total_step, loss.item(), time_end-time_start))
                 time_start = time_end
-
+            writer.add_scalars('three loss', {'loss': loss.item(
+            ), 'pos loss': pos.item(), 'neg loss': neg.item()}, i)
+            # if i == 10:
+            #     writer.close()
         # Save the model checkpoints
         if (epoch+1) % args.save_step == 0:
             torch.save(decoder.state_dict(), os.path.join(
                 args.model_path, 'decoder-{}-{}.ckpt'.format(epoch+1, i+1)))
             torch.save(encoder.state_dict(), os.path.join(
                 args.model_path, 'encoder-{}-{}.ckpt'.format(epoch+1, i+1)))
-
+    writer.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -100,7 +105,7 @@ if __name__ == "__main__":
                         default='./img_tags.json', help='imgages id and tags')
     parser.add_argument('--caption_path', type=str, default='/home/lkk/datasets/coco2014/dataset_coco.json',
                         help='path for train annotation json file')
-    parser.add_argument('--log_step', type=int, default=1,
+    parser.add_argument('--log_step', type=int, default=100,
                         help='step size for prining log info')
     parser.add_argument('--save_step', type=int, default=1,
                         help='step size for saving trained models')
