@@ -61,7 +61,7 @@ def main(args):
 
             # begin with 10.69
             pos = nn.functional.binary_cross_entropy(
-                outputs*targets, targets)*1e3
+                outputs*targets, targets)*1
             # begin with 0.7439
             neg = nn.functional.binary_cross_entropy(
                 outputs*(1-targets)+targets, targets)*1
