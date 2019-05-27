@@ -8,6 +8,7 @@ from PIL import Image
 import json
 import pdb
 
+
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
 
@@ -41,7 +42,8 @@ class CocoDataset(data.Dataset):
         with open(vocab, 'r') as j:
             self.vocab = json.load(j)
         self.transform = transforms.Compose([
-            transforms.RandomCrop(224,pad_if_needed=True),
+            #transforms.RandomCrop(224, pad_if_needed=True),
+            transforms.Resize((224,224)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.485, 0.456, 0.406),
@@ -69,7 +71,7 @@ class CocoDataset(data.Dataset):
         t = list(map(str.lower, self.img_tags[str(ID)]))
         tags = [word2id[token] for token in t]
         target = torch.zeros(len(word2id))
-        target[list(map(lambda n:n-1,tags))]=1
+        target[list(map(lambda n:n-1, tags))]=1
         target = torch.Tensor(target)
         return image, target
 
