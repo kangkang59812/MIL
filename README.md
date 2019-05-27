@@ -1,4 +1,4 @@
-# MIL
+# MIL (Deprecated)
 
 using pytorch on COCO2014
 
